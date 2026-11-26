@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>🎉 Welcome to the Fun Page!</h1>
+    <p>Click the buttons below for some interactive fun. Drag the rolling balls around!</p>
+
+    <button id="colorBtn">Change Background Color</button>
+    <button id="jokeBtn">Tell me a joke</button>
+    <button id="addBallBtn">Add a Ball!</button>
+    <button id="gameBtn">Play Pong vs AI</button>
+    <p id="jokeDisplay"></p>
+    <p id="gameScore" style="font-weight:bold; font-size:18px;"></p>
+
+    <canvas id="canvas" width="800" height="500" style="border:2px solid #333; display:block; margin-top:20px; cursor:grab;"></canvas>
+
+    <script>
+        // background color changer
+        document.getElementById('colorBtn').addEventListener('click', () => {
+            const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+            document.body.style.backgroundColor = randomColor;
+        });
+
+        // joke generator
+        const jokes = [
+            "Why don't scientists trust atoms? Because they make up everything!",
+            "What do you call fake spaghetti? An impasta!",
+            "Why did the scarecrow win an award? Because he was outstanding in his field!",
+            "Why don't skeletons fight each other? They don't have the guts!",
+            "What do you call cheese that isn't yours? Nacho cheese!",
+            "why did the bicycle fall over? Because it was two-tired!",
+            "What do you call a bear with no teeth? A gummy bear!",
+            "Why did the math book look sad? Because it had too many problems!",
+            "What do you call a fish wearing a bowtie? Sofishticated!",
+            "Why did the tomato turn red? Because it saw the salad dressing!",
+            "What do you call a snowman with a six-pack? An abdominal snowman!",
+            "Why did the golfer bring two pairs of pants? In case he got a hole in one!",
+            "What do you call a dinosaur with an extensive vocabulary? A thesaurus!",
+            "Why did the cookie go to the doctor? Because it felt crummy!",
+            "What do you call a sleeping bull? A bulldozer!",
+            "Why did the computer go to the doctor? Because it had a virus!",
+            "What do you call a bear that’s stuck in the rain? A drizzly bearr!",
+            "Why did the chicken join a band? Because it had the drumsticks!",
+            "What do you call a cow with no legs? Ground beef!",
+            "Why did the banana go to the doctor? Because it wasn't peeling well!",
+            "What do you call a dog that can do magic? A labracadabrador!",
+            "Why did the mail man call the police because the police is mail mans friend"
+        ];
+        document.getElementById('jokeBtn').addEventListener('click', () => {
+            const joke = jokes[Math.floor(Math.random() * jokes.length)];
+            document.getElementById('jokeDisplay').textContent = joke;
+        });
+
+        // Canvas physics and rolling balls
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const balls = [];
+        let draggingBall = null;
+        let offsetX = 0;
+        let offsetY = 0;
+        let lastDragX = 0;
+        let lastDragY = 0;
+
+        class Ball {
+            constructor(x, y, radius, color) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 8;
+                this.mass = radius;
+            }
+
+            update() {
+                // Gravity
+                this.vy += 0.3;
+                
+                // Friction/air resistance
+                this.vx *= 0.99;
+                this.vy *= 0.99;
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off walls
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -0.8;
+                }
+                if (this.x + this.radius > canvas.width) {
+                    this.x = canvas.width - this.radius;
+                    this.vx *= -0.8;
+                }
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -0.8;
+                }
+                if (this.y + this.radius > canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    this.vy *= -0.8;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            isMouseOver(mx, my) {
+                const dx = mx - this.x;
+                const dy = my - this.y;
+                return Math.sqrt(dx * dx + dy * dy) < this.radius;
+            }
+
+            collideWith(other) {
+                const dx = other.x - this.x;
+                const dy = other.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = this.radius + other.radius;
+
+                if (distance < minDistance) {
+                    // Collision detected - calculate bounce
+                    const angle = Math.atan2(dy, dx);
+                    const sin = Math.sin(angle);
+                    const cos = Math.cos(angle);
+
+                    // Rotate velocities
+                    const vx1 = this.vx * cos + this.vy * sin;
+                    const vy1 = this.vy * cos - this.vx * sin;
+                    const vx2 = other.vx * cos + other.vy * sin;
+                    const vy2 = other.vy * cos - other.vx * sin;
+
+                    // Swap velocities (for equal mass collision)
+                    this.vx = vx2 * cos - vy1 * sin;
+                    this.vy = vy1 * cos + vx2 * sin;
+                    other.vx = vx1 * cos - vy2 * sin;
+                    other.vy = vy2 * cos + vx1 * sin;
+
+                    // Separate balls to avoid overlap
+                    const overlap = (minDistance - distance) / 2;
+                    const moveX = (overlap * cos);
+                    const moveY = (overlap * sin);
+                    this.x -= moveX;
+                    this.y -= moveY;
+                    other.x += moveX;
+                    other.y += moveY;
+                }
+            }
+        }
+
+        // Create initial balls
+        function createBall() {
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const radius = 15 + Math.random() * 15;
+            const x = Math.random() * (canvas.width - 2 * radius) + radius;
+            const y = Math.random() * (canvas.height / 2) + radius;
+            balls.push(new Ball(x, y, radius, randomColor));
+        }
+
+        // Add button to create more balls
+        document.getElementById('addBallBtn').addEventListener('click', createBall);
+
+        // Create 3 initial balls
+        createBall();
+        createBall();
+        createBall();
+
+        // Mouse events for dragging
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            for (let ball of balls) {
+                if (ball.isMouseOver(mx, my)) {
+                    draggingBall = ball;
+                    offsetX = mx - ball.x;
+                    offsetY = my - ball.y;
+                    lastDragX = mx;
+                    lastDragY = my;
+                    canvas.style.cursor = 'grabbing';
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingBall) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                draggingBall.x = mx - offsetX;
+                draggingBall.y = my - offsetY;
+                // Track velocity from drag movement for fling
+                draggingBall.vx = (mx - lastDragX) * 0.6;
+                draggingBall.vy = (my - lastDragY) * 0.6;
+                lastDragX = mx;
+                lastDragY = my;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            // Ball keeps its velocity from the drag (fling effect)
+            draggingBall = null;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            draggingBall = null;
+            canvas.style.cursor = 'grab';
+        });
+
+        // Animation loop
+        let gameMode = false;
+        let gameScore = { player: 0, ai: 0 };
+        let gameBall = null;
+        let playerPaddle = null;
+        let aiPaddle = null;
+        let playerMouseY = 250;
+
+        class Paddle {
+            constructor(x, y, width, height, color) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            intersectsBall(ball) {
+                return ball.x + ball.radius > this.x &&
+                       ball.x - ball.radius < this.x + this.width &&
+                       ball.y + ball.radius > this.y &&
+                       ball.y - ball.radius < this.y + this.height;
+            }
+        }
+
+        class GameBall {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+                this.radius = 8;
+                this.vx = (Math.random() > 0.5 ? 1 : -1) * 5;
+                this.vy = (Math.random() - 0.5) * 5;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off top and bottom
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -0.9;
+                }
+                if (this.y + this.radius > canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    this.vy *= -0.9;
+                }
+
+                // Paddle collisions
+                if (this.intersectsPaddle(playerPaddle)) {
+                    this.vx = Math.abs(this.vx) * 1.05;
+                    this.x = playerPaddle.x + playerPaddle.width + this.radius;
+                    const hitPos = (this.y - (playerPaddle.y + playerPaddle.height / 2)) / (playerPaddle.height / 2);
+                    this.vy = hitPos * 8;
+                }
+
+                if (this.intersectsPaddle(aiPaddle)) {
+                    this.vx = -Math.abs(this.vx) * 1.05;
+                    this.x = aiPaddle.x - this.radius;
+                    const hitPos = (this.y - (aiPaddle.y + aiPaddle.height / 2)) / (aiPaddle.height / 2);
+                    this.vy = hitPos * 8 + (Math.random() - 0.5) * 2;
+                }
+
+                // Scoring
+                if (this.x < 0) {
+                    gameScore.ai++;
+                    this.reset();
+                }
+                if (this.x > canvas.width) {
+                    gameScore.player++;
+                    this.reset();
+                }
+            }
+
+            intersectsPaddle(paddle) {
+                return this.x + this.radius > paddle.x &&
+                       this.x - this.radius < paddle.x + paddle.width &&
+                       this.y + this.radius > paddle.y &&
+                       this.y - this.radius < paddle.y + paddle.height;
+            }
+
+            draw() {
+                ctx.fillStyle = '#FF1744';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        document.getElementById('gameBtn').addEventListener('click', () => {
+            gameMode = !gameMode;
+            if (gameMode) {
+                gameScore = { player: 0, ai: 0 };
+                gameBall = new GameBall();
+                playerPaddle = new Paddle(20, 200, 15, 100, '#4ECDC4');
+                aiPaddle = new Paddle(canvas.width - 35, 200, 15, 100, '#FF6B6B');
+                document.getElementById('gameBtn').textContent = 'Back to Sandbox';
+            } else {
+                document.getElementById('gameBtn').textContent = 'Play Pong vs AI';
+                document.getElementById('gameScore').textContent = '';
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameMode && playerPaddle) {
+                const rect = canvas.getBoundingClientRect();
+                const my = e.clientY - rect.top;
+                playerPaddle.y = Math.max(0, Math.min(my - playerPaddle.height / 2, canvas.height - playerPaddle.height));
+            }
+        });
+
+        function animate() {
+            // Clear canvas
+            ctx.fillStyle = '#e8f4f8';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (gameMode) {
+                // Pong Game Mode
+                gameBall.update();
+                
+                // Unbeatable AI - perfectly predicts ball trajectory
+                const ballTrajectory = gameBall.y + (gameBall.vy / gameBall.vx * (250 - gameBall.x));
+                const targetY = Math.max(0, Math.min(ballTrajectory, canvas.height - aiPaddle.height));
+                const aiSpeed = 6;
+                if (Math.abs(aiPaddle.y + aiPaddle.height / 2 - gameBall.y) > 5) {
+                    if (aiPaddle.y + aiPaddle.height / 2 < gameBall.y) {
+                        aiPaddle.y = Math.min(aiPaddle.y + aiSpeed, canvas.height - aiPaddle.height);
+                    } else {
+                        aiPaddle.y = Math.max(aiPaddle.y - aiSpeed, 0);
+                    }
+                }
+
+                // Draw paddles and ball
+                playerPaddle.draw();
+                aiPaddle.draw();
+                gameBall.draw();
+
+                // Draw center line
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, 0);
+                ctx.lineTo(canvas.width / 2, canvas.height);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Update score display
+                document.getElementById('gameScore').textContent = `YOU: ${gameScore.player}  |  AI: ${gameScore.ai}`;
+            } else {
+                // Sandbox Mode - update and draw all balls
+                for (let ball of balls) {
+                    if (draggingBall !== ball) {
+                        ball.update();
+                    }
+                    ball.draw();
+                }
+
+                // Check collisions between all balls
+                for (let i = 0; i < balls.length; i++) {
+                    for (let j = i + 1; j < balls.length; j++) {
+                        balls[i].collideWith(balls[j]);
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
